@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>language_admin.css</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>language_admin.css</h1>
+    <pre><code>/* static/language/language_admin.css */
+
+/* Variables CSS pour cohérence et thèmes futurs */
+:root {
+  --border-color: #ccc;
+  --error-fg: #b11;
+  --error-bg: #fee;
+  --success-fg: #3d8b40;
+  --link-fg: #447e9b;
+  --body-quiet-color: #666;
+  --module-bg: #f8f8f8;
+}
+
+/* Classe sr-only pour accessibilité */
+.language-admin .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Style pour warnings */
+.language-admin .form-warning {
+  color: var(--error-fg);
+  margin-top: 6px;
+  font-size: 0.9em;
+  line-height: 1.2;
+  padding: 4px 8px;
+  border-left: 3px solid var(--error-fg);
+  background: var(--error-bg);
+}
+
+/* Style pour le champ code */
+.language-admin .language-code-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.language-admin .language-code-input:focus {
+  border-color: var(--link-fg);
+  outline: 2px solid var(--link-fg);
+  outline-offset: 1px;
+}
+
+/* Ajout d'un hint dans le label */
+.language-admin .field-code label::after {
+  content: " (ex: fr, en, pt-br)";
+  font-weight: normal;
+  color: var(--body-quiet-color);
+  margin-left: 0.25rem;
+}
+
+/* Hint accessible pour lecteurs d'écran */
+.language-admin .code-hint {
+  /* Remplacé display:none par sr-only pour ARIA */
+}
+
+/* Styles pour statuts */
+.language-admin .status-pending {
+  color: var(--body-quiet-color);
+}
+
+.language-admin .status-running {
+  color: var(--link-fg);
+}
+
+.language-admin .status-done {
+  color: var(--success-fg);
+}
+
+.language-admin .status-failed {
+  color: var(--error-fg);
+}
+
+/* Cartes de statistiques */
+.language-admin .stats-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 10px 0;
+}
+
+.language-admin .stats-cards .stat {
+  background: var(--module-bg);
+  padding: 8px;
+  border-radius: 4px;
+  flex: 1 1 200px;
+}
+
+/* Tableaux de statistiques */
+.language-admin .stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+
+.language-admin .stats-table th,
+.language-admin .stats-table td {
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  text-align: left;
+}
+
+/* Liste des erreurs */
+.language-admin .error-list {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+/* Liste des origines */
+.language-admin .origin-list {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+/* Actions */
+.language-admin .actions {
+  margin-top: 20px;
+}
+
+.language-admin .actions .button {
+  margin-right: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.language-admin .actions .button:focus {
+  outline: 2px solid var(--link-fg);
+  outline-offset: 2px;
+}
+
+/* Spinner pour relance */
+.language-admin .spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  font-size: 1em;
+  aria-hidden: true;
+}
+
+/* Animation pour spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Media queries pour responsivité */
+@media screen and (max-width: 600px) {
+  .language-admin .stats-table th,
+  .language-admin .stats-table td {
+    padding: 4px;
+    font-size: 0.85em;
+  }
+
+  .language-admin .stats-cards {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .language-admin .stats-cards .stat {
+    flex: 1 1 auto;
+  }
+
+  .language-admin .actions .button {
+    display: block;
+    margin: 10px 0;
+  }
+}
+
+/* Media query pour impression */
+@media print {
+  .language-admin .spinner {
+    display: none;
+  }
+
+  .language-admin .stats-table,
+  .language-admin .stats-cards,
+  .language-admin .error-list,
+  .language-admin .origin-list {
+    background: #fff;
+    color: #000;
+    font-size: 12pt;
+  }
+
+  .language-admin .actions {
+    display: none; /* Pas d'actions à l'impression */
+  }
+
+  .language-admin .form-warning {
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+  }
+}
+
+/* Media query pour high-contrast */
+@media (prefers-contrast: high) {
+  .language-admin .form-warning {
+    background: #000;
+    color: #fff;
+    border-left: 3px solid #fff;
+  }
+
+  .language-admin .language-code-input {
+    border: 2px solid #000;
+    background: #fff;
+    color: #000;
+  }
+
+  .language-admin .language-code-input:focus {
+    outline: 3px solid #000;
+    outline-offset: 2px;
+  }
+
+  .language-admin .stats-table,
+  .language-admin .stats-table th,
+  .language-admin .stats-table td {
+    border: 2px solid #000;
+    background: #fff;
+    color: #000;
+  }
+
+  .language-admin .status-pending,
+  .language-admin .status-running,
+  .language-admin .status-done,
+  .language-admin .status-failed {
+    color: #000;
+    font-weight: bold;
+  }
+}</code></pre>
+</body>
+</html>

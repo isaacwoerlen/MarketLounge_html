@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>change_list.html</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>change_list.html</h1>
+    <pre><code>{% extends "admin/change_list.html" %}
+
+{% block object-tools %}
+  {{ block.super }}
+  {% if custom_button %}
+    <li>{{ custom_button|safe }}</li>
+  {% endif %}
+{% endblock %}
+</code></pre>
+</body>
+</html>

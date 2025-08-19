@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>README Brief Technique_V03.md</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>README Brief Technique_V03.md</h1>
+    <pre><code>📘 README — Apps MarketLounge
+
+Introduction
+Conventions de développement
+Structure du projet
+Stack Technique
+Apps transverses
+language
+seo
+LLM_ai
+matching
+media
+taxonomy
+metrics
+permissions
+utils_core
+
+
+Apps verticales
+glossary
+company
+dico
+market
+curation
+logs
+activation
+api
+
+
+Vectorisation & Recherche Sémantique
+Stratégie d’interactions inter-apps
+Dépendances entre Apps
+Règles d’Architecture
+Conventions de Nomage
+Squelette app_exemple
+Priorités Développement
+Verticales de base (Sprint 1 – J3→J5)
+Activation (Sprint 1 – J5)
+Matching + Vectorisation (Sprint 2 – J1→J4)
+Logs & explicabilité (Sprint 2 – J4)
+Tâches offline & cron (Sprint 2 – J5)
+Sécurité & API (Sprint 3 – J1)
+CI / Qualité / Tests (Sprint 3 – J1→J2)
+Monitoring & VPS (Sprint 3 – J2→J3)
+Backlog immédiat
+Seed minimal
+Changements depuis V01
+
+Introduction
+Ce répertoire contient toutes les applications Django du projet MarketLounge, divisées en :
+
+Verticales : Spécifiques à un domaine métier (ex. : glossary, market, matching, dico, curation).
+Transverses : Services techniques réutilisables (ex. : language, seo, utils_core).
+
+Ce document est aligné avec README_Architecture du Lounge_V07.md, détaillant les flux (offline → runtime → apprentissage). Les apps respectent le principe no-overlap : chaque app a un rôle unique (ex. : dico pour génération concepts offline, matching pour matching runtime hybrid avec FAISS/pgvector/Redis).
+Conventions de développement
+
+Chaque app possède un README.md décrivant objectif, modèles, vues, tâches, etc.
+Apps transverses (language, seo, utils_core) ne dépendent pas des verticales.
+Apps verticales consomment les transverses via mixins, helpers ou modèles abstraits.
+Tests organisés dans apps/<app>/tests/ avec pytest, couverture >80%.
+Fichiers respectent la structure définie dans app_exemple/.
+Docstrings au format Google pour lisibilité, avec exemples et types explicites.
+
+Structure du projet
+MarketLounge/
+├── apps/
+│   ├── transversales/ ← Services réutilisables
+│   │   ├── language/
+│   │   ├── seo/
+│   │   ├── media/
+│   │   ├── taxonomy/
+│   │   ├── utils_core/
+│   │   ├── metrics/
+│   │   ├── permissions/
+│   │   └── LLM_ai/
+│   ├── verticales/ ← Apps métier
+│   │   ├── activation/
+│   │   ├── api/
+│   │   ├── company/
+│   │   ├── glossary/
+│   │   ├── logs/
+│   │   ├── market/
+│   │   ├── matching/ ← Inclut FAISS/pgvector
+│   │   ├── dico/
+│   │   └── curation/
+│   └── README/ ← Modèles README
+│       ├── README Brief Technique.md
+│       ├── README_app_exemple.md
+│       └── README_glossary.md
+├── config/ ← Django/Celery config
+│   ├── settings.py
+│   ├── asgi.py
+│   ├── urls.py
+│   ├── wsgi.py
+│   └── celery.py
+├── faiss_index/ ← Index FAISS persistés
+├── logs/ ← Logs applicatifs
+├── staticfiles/ ← Fichiers statiques
+├── venv/ ← Environnement virtuel
+├── .env
+├── .gitignore
+├── check_encoding.py
+├── docker-compose.yml
+├── Dockerfile
+├── manage.py
+├── nginx.conf
+└── requirements.txt
+
+Stack Technique
+
+
+
+Composant
+Technologie
+
+
+
+Backend
+Django + REST Framework
+
+
+Base de données
+PostgreSQL + pgvector
+
+
+Vector DB
+FAISS (.index)
+
+
+UI
+Django Templates + htmx
+
+
+Style
+Tailwind CSS (CDN)
+
+
+Authentification
+Django auth
+
+
+Déploiement
+Docker + nginx
+
+
+IA locale
+sentence-transformers
+
+
+Tâches asynchrones
+Celery + django_celery_beat
+
+
+Cache
+Redis (pour résultats matching)
+
+
+API externe
+societe.com
+
+
+API IA
+Mistral API
+
+
+Apps transverses
+language
+Objectif : Traduction automatique des champs via Mistral API.Fonctionnement : Centralise langues activées ; traduit champs marqués ; évite duplication (ex. : label_fr).Intégration : Importer mixins/fonctions dans modèles ; utiliser helpers dans vues/serializers.Exemple :
+from transversales.language.services import batch_translate_items
+batch_translate_items(item_ids=["node_1"], fields=["label"], source_lang="fr", target_langs=["en"])
+
+DoD : Traduction automatique des labels dans glossary.
+seo
+Objectif : Injection champs SEO/OpenGraph dans modèles.Fonctionnement : Utilise SEOblock mixin ; traduit via language ; génère balises meta.Intégration : Ajouter SEOblock dans modèles ; utiliser helpers dans templates/serializers.DoD : Balises meta générées dans market (ex. : <meta name="description" content="...">).
+LLM_ai
+Objectif : Enrichissements sémantiques via LLM (Mistral, OpenAI).Fonctionnement : Génère résumés, suggestions ; expose API interne.Intégration : Utiliser helpers dans services.py/tasks.py des verticales.DoD : Stub rerank dans matching.fuse_and_score via LLM_ai.
+matching
+Objectif : Matching runtime hybrid (lexical + vectoriel) avec vectorisation/recherche sémantique.Dépendances : LLM_ai, taxonomy, utils_core.Fonctionnement : Encode via sentence-transformers ; stocke vecteurs pgvector ; index FAISS (.index) ; rerank via LLM ; cache résultats Redis (DoD : cache hit >80%).Intégration : Helpers (encode_text, store_vector, search_similar) ; synchronise index via Celery.Exemple :
+from utils_core.text_cleaning import normalize_text
+from verticales.matching.services import encode_text
+query = normalize_text("Soudure Inox 316L", remove_accents_flag=True)
+vector = encode_text(query)
+
+media
+Objectif : Gestion multimédias (images, vidéos, documents).Fonctionnement : Stockage/métadonnées ; associe à contenus.Intégration : Importer modèles/helpers pour associer fichiers.
+taxonomy
+Objectif : Gouvernance types/rôles/structures métier.Fonctionnement : Définit taxonomies réutilisables (catégories, tags, hiérarchies).Intégration : Utiliser modèles/helpers pour appliquer taxonomies.
+metrics
+Objectif : Suivi enrichissements, alertes, usages.Fonctionnement : Collecte métriques (recherches, IA) ; expose rapports via Prometheus/StatsD.Intégration : Importer helpers pour enregistrer métriques.Exemple :
+from utils_core.metrics import log_metric
+log_metric("match.query.latency_ms", 150.5, {"scope": "company"}, tenant_id="tenant_123")
+
+permissions
+Objectif : Droits d’accès mutualisés.Fonctionnement : Règles granulaires par rôle/entreprise ; décorateurs/mixins.Intégration : Appliquer dans views.py/serializers.py.
+utils_core
+Objectif : Fonctions utilitaires transverses (JSON, dates, formats).Fonctionnement : Centralise helpers techniques sans logique métier (ex. : compute_checksum, normalize_text).Philosophie du module : Fournir des utilitaires génériques utilisés par ≥2 apps, sans logique métier, avec docstrings Google et tests >80% couverture.Intégration : Importer dans verticales/transverses via from utils_core import ....Dépendances : tenacity, numpy, python-decouple, ijson (optionnel).Exemple :
+from utils_core import compute_checksum, normalize_text, stream_json_loads
+checksum = compute_checksum("Soudure inox 316L")
+query = normalize_text("<p>Café français</p>", remove_accents_flag=True)
+data = list(stream_json_loads('[{"id": 1}, {"id": 2}]'))
+
+Tests : Exécuter avec pytest tests/test_utils_core/ --cov=utils_core.
+Apps verticales
+
+
+
+App
+Dépendances transverses
+Multi-tenancy
+
+
+
+glossary
+language, seo, LLM_ai, media, taxonomy, matching
+✅ (tenant_id sur nœuds)
+
+
+company
+language, seo, media, LLM_ai
+✅ (tenant_id sur profils)
+
+
+dico
+LLM_ai, taxonomy
+✅ (tenant_id sur concepts)
+
+
+market
+language, matching, taxonomy, metrics
+✅ (tenant_id sur offres)
+
+
+curation
+language, seo, media, taxonomy, matching, LLM_ai
+✅ (tenant_id sur validations)
+
+
+logs
+metrics, permissions
+✅ (tenant_id sur logs)
+
+
+activation
+permissions, metrics
+✅ (tenant_id sur activations)
+
+
+api
+language, seo, matching, taxonomy
+✅ (tenant_id sur requêtes)
+
+
+glossary
+Objectif : Structurer savoir-faire industriels (définitions, termes).Fonctionnement : Gère termes avec définitions, traductions, SEO ; utilise matching pour recherches sémantiques.Intégration : Modèles avec SEOblock ; traduction via language ; vectorisation via matching.DoD : Traduction automatique des labels via language (ex. : label_fr → label_en).
+company
+Objectif : Gérer données entreprise (fiches, SIREN).Fonctionnement : Intègre via API Societe.com ; enrichit résumés IA.Intégration : Modèles avec SEOblock ; traduction via language.
+dico
+Objectif : Génération offline concepts activables (Dictionnaire Sémantique).Fonctionnement : Parse facettes ; valide via Glossaire ; enrichit statiquement (synonymes, embeddings).Intégration : Helpers pour matching (usage runtime), curation (validation).
+market
+Objectif : Gestion offres/demandes ; analyse marché (tensions, raretés).Fonctionnement : Création/recherche offres ; utilise matching pour recommandations ; croise offre/demande.Intégration : Recherche via matching ; suivi via metrics.DoD : Balises SEO générées via seo (ex. : <meta name="keywords" content="...">).
+curation
+Objectif : Curation contenus (sélection, validation humaine).Fonctionnement : Sélectionne/organise contenus ; valide proposals ; enrichit via dico.Intégration : Modèles avec SEOblock ; traduction via language ; recherche via matching.
+logs
+Objectif : Historiser actions, enrichissements, alertes (query_match_log).Fonctionnement : Enregistre événements ; fournit rapports ; trace request_ID.Intégration : Enregistrement via signaux/tâches ; feedback à curation.
+activation
+Objectif : Activation comptes/onboarding/rôles ; index activations concepts.Fonctionnement : Flux inscription ; applique rôles ; index activations pour matching.Intégration : Sécurisation via permissions ; suivi via metrics.
+api
+Objectif : Endpoints publics/internes.Fonctionnement : Expose données verticales via REST ; intègre recherches sémantiques.Intégration : Serializers/vues pour exposer données.
+Vectorisation & Recherche Sémantique
+Gérée par matching :  
+
+Encodage : sentence-transformers (multi-lang out-of-box).  
+Stockage : pgvector PostgreSQL.  
+Indexation : FAISS (.index, IVF/HNSW, auto-backup via Celery task).  
+Synchronisation : Celery/commande CLI.  
+Cache : Redis pour résultats runtime (DoD : cache hit >80%).
+
+Exemple :
+from utils_core.text_cleaning import normalize_text_batch
+from verticales.matching.services import encode_text
+texts = ["Soudure Inox", "Usinage 5 axes"]
+vectors = encode_text(normalize_text_batch(texts))
+
+Stratégie d’interactions inter-apps
+Contexte
+Apps verticales (glossary, market) appellent les transverses (language, utils_core) via un modèle pull (appels Python directs). Migration HTTP prévue pour complexité accrue (ex. : microservices, dashboards). FastAPI considéré pour services à haute fréquence (language, LLM_ai, matching) dans V1.1+.
+Approche Actuelle : Appels Python Directs
+
+Modèle Pull : Apps verticales appellent services transverses (ex. : language.services.batch_translate_items) via clients encapsulés (ex. : glossary/services/language_client.py).
+Exemple :from transversales.language.services import batch_translate_items
+class Term(models.Model):
+    def save(self, *args, **kwargs):
+        batch_translate_items(item_ids=[self.id], fields=["name"], source_lang="fr", target_langs=["en"])
+
+
+Avantages : Performance (pas de latence réseau), simplicité, sécurité.
+
+Migration Future : Interactions HTTP
+
+Quand migrer : Complexité accrue (ex. : language comme microservice), dashboards internes, découplage.
+Mise en œuvre :
+Clients avec switch dynamique (ex. : USE_LANGUAGE_HTTP=true pour requests.post).
+Endpoints REST dans urls.py, views.py, serializers.py (actuellement commentés, LANG_ENABLE_API=False).
+Sécurité : IsAdminUser, throttling léger (ex. : 200/min).
+
+
+
+Dépendances entre Apps
+
+
+
+App verticale
+Dépendances transverses
+Multi-tenancy
+
+
+
+glossary
+language, seo, LLM_ai, media, taxonomy, matching
+✅ (tenant_id sur nœuds)
+
+
+company
+language, seo, media, LLM_ai
+✅ (tenant_id sur profils)
+
+
+dico
+LLM_ai, taxonomy
+✅ (tenant_id sur concepts)
+
+
+market
+language, matching, taxonomy, metrics
+✅ (tenant_id sur offres)
+
+
+curation
+language, seo, media, taxonomy, matching, LLM_ai
+✅ (tenant_id sur validations)
+
+
+logs
+metrics, permissions
+✅ (tenant_id sur logs)
+
+
+activation
+permissions, metrics
+✅ (tenant_id sur activations)
+
+
+api
+language, seo, matching, taxonomy
+✅ (tenant_id sur requêtes)
+
+
+Interdictions : Transverses ne dépendent pas de verticales ; pas de logique métier spécifique ; pas de modification directe.
+Règles d’Architecture
+
+Définition : Transverses fournissent services techniques/sémantiques (ex. : traduction, SEO). Pas de logique métier ; interfaces génériques.
+Principe Maîtrise : Verticales contrôlent contexte/déclenchement (pull) ; transverses fournissent résultats sans initiative.
+Exemple : glossary appelle seo avec titre/définition ; seo retourne balises ; glossary décide usage.
+
+Conventions de Nomage
+
+
+
+Élément
+Convention
+
+
+
+App transverse
+snake_case, technique (language, seo)
+
+
+App verticale
+snake_case, métier (glossary, dico)
+
+
+Modèle principal
+PascalCase, singulier (GlossaryNode)
+
+
+Fichier métier
+services.py (logique), utils.py (helpers)
+
+
+Champ traduisible
+labels, definition (JSONField)
+
+
+Tâche Celery
+run_generate_X, sync_embeddings_X
+
+
+Commande CLI
+enrich_X.py, sync_faiss_index.py
+
+
+Squelette app_exemple
+apps/
+└── transversales|verticales/
+    ├── <app_name>/
+    │   ├── __init__.py
+    │   ├── apps.py          # Config Django
+    │   ├── models.py        # Modèles
+    │   ├── admin.py         # Admin
+    │   ├── forms.py         # Formulaires
+    │   ├── serializers.py   # Sérialisation
+    │   ├── views.py         # Contrôleurs
+    │   ├── services.py      # Logique métier
+    │   ├── urls.py          # Routage
+    │   ├── tasks.py         # Tâches Celery
+    │   ├── utils.py         # Helpers
+    │   ├── signals.py       # Événements
+    │   ├── permissions.py   # Accès
+    │   ├── management/commands/ # CLI
+    │   ├── templates/admin/ # Templates admin
+    │   ├── static/         # JS/CSS
+    │   ├── specific/fixtures/ # Fixtures
+    └── tests/              # Tests pytest
+
+
+
+
+Ordre
+Fichier
+Rôle
+Frontière
+
+
+
+[0]
+apps.py
+Déclare app
+Pas logique métier
+
+
+[1]
+models.py
+Structure données
+Pas encoding/enrichissement
+
+
+[2]
+services.py
+Logique métier
+Pas HTTP/serializers
+
+
+[3]
+serializers.py
+Formatage
+Pas logique complexe
+
+
+[4]
+views.py
+Contrôleurs
+Délègue à services.py
+
+
+[5]
+urls.py
+Routage
+Pas logique
+
+
+[6]
+admin.py
+Admin
+Pas complexe
+
+
+[7]
+forms.py
+Validation
+Pas services externes
+
+
+[8]
+tasks.py
+Tâches Celery
+Délègue à services.py
+
+
+[9]
+signals.py
+Événements
+Délègue à services.py
+
+
+[10]
+permissions.py
+Accès
+Pas traitement données
+
+
+[11]
+management/commands/
+CLI
+Délègue à services.py
+
+
+[12]
+templates/admin/
+Templates
+Pas Python
+
+
+[13]
+static/*.js
+JS
+Pas backend
+
+
+[14]
+static/*.css
+CSS
+Pas backend
+
+
+[15]
+fixtures/
+Données test
+Pas logique
+
+
+Priorités Développement
+
+
+
+App transverse
+Priorité
+
+
+
+language
+🔥 Haute
+
+
+LLM_ai
+🔥 Haute
+
+
+taxonomy
+⚡ Moyenne
+
+
+media
+⚡ Moyenne
+
+
+seo
+🌱 Basse
+
+
+metrics
+🌱 Basse
+
+
+permissions
+🌱 Basse
+
+
+utils_core
+🌱 Basse
+
+
+Verticales de base (Sprint 1 – J3→J5)
+
+glossary : GlossaryNode(node_id, type, parent, path, labels, description, explication_technique, status/version), admin optimisée, appel translate_fields avant save.DoD : Création/validation d’un nœud, path auto, traduction labels via language.  
+company : CompanyProfile(company_id, facettes JSON, source, flags) (collecte brute).DoD : POST via DRF.
+dico : Concept(concept_ID, labels, definition, synonyms, related_to, embedding NULL, glossary_node_ids), offline only.DoD : CLI propose_concept_from_glossary (draft).
+
+Activation (Sprint 1 – J5)
+
+activation : CompanyConceptActivation(company_id, concept_ID, facettes, evidence, is_claimed), build offline depuis company + dico.DoD : Commande activation.build_from_profiles qui peuple l’index.
+
+Matching + Vectorisation (Sprint 2 – J1→J4)
+Une seule app matching embarquant vectorisation (FAISS/pgvector) en modules internes.  
+
+Stub vectoriel : Mock FAISS avec liste simple pour tester lexical seul (J1).  
+Full FAISS : Implémentation complète (J3).
+
+Modèles / stockage
+
+Embeddings : Stockés en pgvector (PostgreSQL).  
+Index FAISS : Persistant dans faiss_index/ (IVF/HNSW, auto-backup via Celery).
+
+services.py (matching)
+
+encode_text(text) : Via sentence-transformers.
+search_lexical(query, corpus=dico.labels+synonyms) : Normalisation + fuzzy.
+search_vector(query) : Encode → interroge FAISS (cosine/sim) avec stub (J1) et full implémentation (J3).
+fuse_and_score(lex, vec) : Union pondérée (ex. : 0.6/0.4), seuils adaptatifs, stub rerank via LLM_ai.
+filter_by_activation(shortlist, company_activation) : Filtre final runtime.
+sync_faiss_index() : Commande/task Celery pour (ré)générer .index.DoD :
+sync_faiss_index produit un .index exploitable.
+search_vector() interroge l’index (perfs OK en dev).
+/api/match renvoie shortlist cohérente (fusion lexical+vectoriel, filtrée).
+Cache hit >80% via Redis.
+
+
+
+views.py (matching)
+
+POST /api/match : Payload {query, filters?} → {shortlist: [...], explain: {scores, sources}}.
+
+Logs & explicabilité (Sprint 2 – J4)
+
+logs : QueryMatchLog(request_ID UUID, raw_text, matched_concepts, scores, rationale) ; hook post-fusion.DoD : Chaque /api/match crée un log consultable.
+
+Tâches offline & cron (Sprint 2 – J5)
+
+Celery Beat :
+Glossaire : Mensuel (signalement fusions).
+Dico : Bimensuel (revalidation).
+Company : Hebdo (rescan modifs).DoD : Tâches « no-op » s’exécutent et journalisent correctement.
+
+
+
+Sécurité & API (Sprint 3 – J1)
+
+Auth token/clé, rate limiting (Nginx/django-ratelimit), CORS si front séparé.DoD : /api/match protégé (401 si non autorisé).
+
+CI / Qualité / Tests (Sprint 3 – J1→J2)
+
+GitHub Actions : ruff/flake8, black, pytest + couverture.  
+Tests critiques : matching.services (fusion/filtre), language (cache/validators), sync_faiss_index, utils_core (validators, metrics).DoD : Pipeline vert, >80% couverture sur matching.services, utils_core.
+
+Monitoring & VPS (Sprint 3 – J2→J3)
+
+/health, Uptime Kuma ou Prometheus/Grafana ; VPS Docker Compose (web, db, FAISS, Redis, Nginx, Certbot).  
+Backups : pg_dump + faiss_index/*.index.DoD : Domaine + HTTPS opérationnels, backup vérifié.
+
+Backlog immédiat
+
+language : Modèles, services, tests (incl. traduction labels).
+glossary : Modèle/admin, path auto.
+company : API POST.
+dico : Concept draft, CLI.
+activation : Build offline.
+matching : Lexical → vectoriel (stub J1, FAISS J3) → sync_faiss_index → /api/match.
+
+Seed minimal
+
+10 nœuds Glossaire, 20 Concepts (labels/synonyms/definition), 5 CompanyProfiles, 10 Activations.  
+Objectif : Valider /api/match dès la fin de la fusion matching+vectorisation.
+
+Changements depuis V01
+
+Fusion Matching/Vectorisation : Clarifié en "Sprint 2 J1-4" (supprime confusion J1-3 vs J3-4). Stub search_vector (J1) avec mock FAISS (liste simple), full FAISS J3.
+DoD ajoutés :
+Multilingue : Traduction labels dans glossary via language.
+SEO : Balises meta dans market via seo.
+IA : Stub rerank dans matching.fuse_and_score via LLM_ai.
+Cache : Redis pour matching (cache hit >80%).
+Backup : Auto-backup FAISS index via Celery task.
+
+
+utils_core :
+Migré Timer vers time_utils.py (renommé timer), retry_on_exception vers decorators.py.
+Ajouté normalize_text_batch (NumPy) dans text_cleaning.py pour traitement batch.
+Ajouté stream_json_loads (ijson) dans json_utils.py pour gros payloads.
+Ajouté validate_json_schema dans validators.py pour payloads complexes.
+Intégré tenant_id dans metrics.py pour multi-tenancy.
+Ajouté cache LRU dans env.get_env_variable.
+Docstrings uniformisés en Google pour lisibilité.
+
+
+</code></pre>
+</body>
+</html>

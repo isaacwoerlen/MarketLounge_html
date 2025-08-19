@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>translate_action.html</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>translate_action.html</h1>
+    <pre><code>{% extends "admin/base_site.html" %}
+{% load static %}
+{% block content %}
+  <h1>{{ title }}</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="submit-row" style="margin-bottom:1rem">
+      <input type="submit" name="apply" value="Lancer la traduction" class="default">
+      <a href=".." class="button cancel-link">Annuler</a>
+    </div>
+
+    <fieldset class="module aligned">
+      <div class="form-row">{{ form.source_lang.label_tag }} {{ form.source_lang }}</div>
+      <div class="form-row">{{ form.target_langs.label_tag }} {{ form.target_langs }}</div>
+      <div class="form-row">{{ form.only_missing }} {{ form.only_missing.label_tag }}</div>
+      <div class="form-row">{{ form.include_seo }} {{ form.include_seo.label_tag }}</div>
+    </fieldset>
+
+    {% for gid in gids %}
+      <input type="hidden" name="gids" value="{{ gid }}">
+    {% endfor %}
+  </form>
+{% endblock %}
+</code></pre>
+</body>
+</html>

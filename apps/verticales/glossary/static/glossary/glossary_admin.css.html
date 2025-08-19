@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>glossary_admin.css</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>glossary_admin.css</h1>
+    <pre><code>/* Onglets de langue */
+.lang-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 10px 0;
+}
+.lang-tab {
+  border: 1px solid #ddd;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f7f7f7;
+  cursor: pointer;
+  font-size: 12px;
+}
+.lang-tab.active {
+  background: #e8f0ff;
+  border-color: #93b4f5;
+}
+
+/* Masquage / verrouillage */
+.form-row.lang-hidden,
+fieldset.lang-hidden {
+  display: none;
+}
+.form-row.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Alerte IA dans la section Gouvernance */
+.alerts-warning {
+  color: #b11;
+  margin-top: 6px;
+  font-size: 0.9em;
+}
+</code></pre>
+</body>
+</html>

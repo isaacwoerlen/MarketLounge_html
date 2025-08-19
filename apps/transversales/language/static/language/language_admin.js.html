@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>language_admin.js</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>language_admin.js</h1>
+    <pre><code>/* static/language/language_admin.js */
+(function () {
+  // i18n via Django gettext (fourni par Django dans admin)
+  const _ = window.gettext || (msg => msg); // Fallback si gettext absent
+  const CODE_RE = /^[a-z]{2}(-[a-z]{2})?$/;
+
+  // Utilitaire debounce pour limiter appels répétés
+  function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  }
+
+  // Normalisation robuste
+  function normalizeCode(value) {
+    if (!value) return "";
+    return value.trim().toLowerCase().replaceAll("_", "-");
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // Sélecteurs avec fallback
+    const codeInput = document.querySelector(".language-code-input") || document.querySelector("#id_code");
+    const nameInput = document.querySelector(".language-name-input") || document.querySelector("#id_name");
+    const isActiveInput = document.querySelector(".language-is-active-input") || document.querySelector("#id_is_active");
+    const isDefaultInput = document.querySelector(".language-is-default-input") || document.querySelector("#id_is_default");
+    const form = document.querySelector("form");
+
+    // Vérification des champs requis
+    if (!codeInput || !nameInput || !isActiveInput || !isDefaultInput || !form) {
+      console.error("Required form fields missing.");
+      return;
+    }
+
+    // Création élément warning avec ARIA
+    const warnElement = document.createElement("div");
+    warnElement.className = "language-admin form-warning";
+    warnElement.id = "language-code-warning";
+    warnElement.setAttribute("role", "alert");
+    warnElement.setAttribute("aria-live", "assertive");
+
+    // Validation du code langue avec debounce
+    codeInput.addEventListener("blur", debounce(() => {
+      const normalized = normalizeCode(codeInput.value);
+      if (normalized && !CODE_RE.test(normalized)) {
+        warnElement.textContent = _("Invalid language code (e.g., 'fr', 'pt-br').");
+        const codeWrapper = codeInput.closest(".form-row, .field-code");
+        if (codeWrapper) {
+          codeWrapper.appendChild(warnElement);
+          codeInput.setAttribute("aria-describedby", "language-code-warning");
+        } else {
+          form.appendChild(warnElement);
+          codeInput.setAttribute("aria-describedby", "language-code-warning");
+        }
+        console.warn(`Invalid language code: ${codeInput.value}`);
+      } else {
+        codeInput.value = normalized;
+        if (warnElement.parentNode) {
+          warnElement.parentNode.removeChild(warnElement);
+          codeInput.removeAttribute("aria-describedby");
+        }
+      }
+    }, 300)); // Debounce 300ms
+
+    // Contrôle is_default implique is_active
+    isDefaultInput.addEventListener("change", () => {
+      if (isDefaultInput.checked && !isActiveInput.checked) {
+        isActiveInput.checked = true;
+        warnElement.textContent = _("Default language must be active.");
+        const codeWrapper = codeInput.closest(".form-row, .field-code");
+        if (codeWrapper) {
+          codeWrapper.appendChild(warnElement);
+          isDefaultInput.setAttribute("aria-describedby", "language-code-warning");
+        } else {
+          form.appendChild(warnElement);
+          isDefaultInput.setAttribute("aria-describedby", "language-code-warning");
+        }
+        console.warn("Default language forced active");
+      } else if (warnElement.parentNode) {
+        warnElement.parentNode.removeChild(warnElement);
+        isDefaultInput.removeAttribute("aria-describedby");
+      }
+    });
+
+    // Spinner pour boutons de relance
+    document.querySelectorAll("button[data-task]").forEach(button => {
+      button.addEventListener("click", () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        const spinner = document.createElement("span");
+        spinner.className = "language-admin spinner";
+        spinner.textContent = "⏳";
+        spinner.setAttribute("aria-hidden", "true");
+        button.appendChild(spinner);
+        button.setAttribute("aria-busy", "true");
+      });
+    });
+  });
+})();</code></pre>
+</body>
+</html>

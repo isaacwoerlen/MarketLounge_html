@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>glossary_admin.js</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>glossary_admin.js</h1>
+    <pre><code>// Glossary admin UX helpers
+// - Onglets de langue (FR/EN/…)
+// - Masquage des champs multilingues selon l’onglet actif
+// - Affichage contextualisé selon le type (metier / operation / variante)
+// - Lecture du statut IA via `alerts_pretty` + atténuation des champs en attente
+
+(function () {
+  // ---------------- Utils ----------------
+  function debounce(fn, delay) {
+    let t;
+    return function () {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, arguments), delay);
+    };
+  }
+
+  // Détecte les langues depuis les classes de champs: .form-row.field-label_fr
+  function detectLangs() {
+    const set = new Set();
+    document.querySelectorAll('[class*="field-label_"]').forEach(el => {
+      const m = el.className.match(/field-label_([a-z]{2})/);
+      if (m) set.add(m[1]);
+    });
+    return Array.from(set);
+  }
+
+  // Renvoie le fieldset qui contient le premier champ du préfixe donné
+  function fieldsetFor(prefix, langs) {
+    for (const lang of langs) {
+      const row = document.querySelector(`.form-row.field-${prefix}_${lang}`);
+      if (row) return row.closest('fieldset');
+    }
+    return null;
+  }
+
+  // Affiche uniquement les lignes .form-row de la langue active
+  function toggleLangRows(activeLang, langs) {
+    const prefixes = ["label", "definition", "procede", "explication_technique", "seo_keywords", "seo_description"];
+    for (const lang of langs) {
+      for (const p of prefixes) {
+        const row = document.querySelector(`.form-row.field-${p}_${lang}`);
+        if (!row) continue;
+        row.classList.toggle('lang-hidden', lang !== activeLang);
+      }
+    }
+  }
+
+  // Crée les onglets de langue et branche le switch
+  function createLanguageTabs(langs) {
+    if (langs.length === 0) return;
+
+    const fLabels = fieldsetFor("label", langs) || document.querySelector('form#glossarynode_form fieldset');
+    if (!fLabels) return;
+
+    // Évite le doublon si re-exécution
+    if (document.querySelector('.lang-tabs')) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'lang-tabs';
+    for (const lang of langs) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = lang.toUpperCase();
+      btn.className = 'lang-tab';
+      btn.dataset.lang = lang;
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.lang-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
+        toggleLangRows(lang, langs);
+      });
+      bar.appendChild(btn);
+    }
+
+    // Insère la barre avant le fieldset des labels
+    fLabels.parentNode.insertBefore(bar, fLabels);
+
+    // Active la 1re langue par défaut
+    const first = langs[0];
+    document.querySelectorAll('.lang-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === first));
+    toggleLangRows(first, langs);
+  }
+
+  // Logique d’affichage selon le type
+  function applyTypeLogic(langs) {
+    const typeField = document.getElementById('id_type');
+    if (!typeField) return;
+
+    const val = typeField.value; // "metier" | "operation" | "variante"
+    const fDef  = fieldsetFor("definition", langs);
+    const fProc = fieldsetFor("procede", langs);
+    const fTech = fieldsetFor("explication_technique", langs);
+
+    // Reset
+    [fDef, fProc, fTech].forEach(fs => fs && fs.classList.remove('lang-hidden'));
+
+    if (val === 'metier') {
+      // Métier : pas de procédé ni explication technique
+      if (fProc) fProc.classList.add('lang-hidden');
+      if (fTech) fTech.classList.add('lang-hidden');
+    } else if (val === 'operation') {
+      // Opération : définition + (procédé optionnel), pas d'explication technique
+      if (fTech) fTech.classList.add('lang-hidden');
+    } else if (val === 'variante') {
+      // Variante : explication technique oui, on masque définition & procédé
+      if (fDef)  fDef.classList.add('lang-hidden');
+      if (fProc) fProc.classList.add('lang-hidden');
+    }
+  }
+
+  // Lecture robuste du rendu d’alertes (readonly) pour déterminer le statut IA
+  function readIaStatus() {
+    const el = document.querySelector('.form-row.field-alerts_pretty .readonly');
+    if (!el) return { hasAlerts: false, pending: false, text: '' };
+    const txt = (el.innerText || '').trim();
+    const has = txt !== '—' && txt.length > 0;
+    const pending = /ia_pending|en attente/i.test(txt);
+    return { hasAlerts: has, pending, text: txt };
+  }
+
+  // Si “en attente IA”, atténue les champs éditables + affiche un petit warning
+  function updateAlertsUi(langs) {
+    const { hasAlerts, pending } = readIaStatus();
+
+    // Ajoute un warning dans le fieldset Gouvernance / Statut
+    const govFieldset = Array.from(document.querySelectorAll('fieldset')).find(fs => {
+      const legend = fs.querySelector('h2, legend');
+      return legend && /Gouvernance|Statut|Status/i.test(legend.textContent || '');
+    });
+    if (govFieldset) {
+      const old = govFieldset.querySelector('.alerts-warning');
+      if (old) old.remove();
+      if (hasAlerts) {
+        const w = document.createElement('div');
+        w.className = 'alerts-warning';
+        w.textContent = pending
+          ? '⚠️ Alerte IA : génération en attente — certains champs sont verrouillés.'
+          : 'ℹ️ Alertes IA présentes — vérifiez le contenu.';
+        govFieldset.appendChild(w);
+      }
+    }
+
+    // Atténue les lignes multilingues en attente
+    const prefixes = ["label", "definition", "procede", "explication_technique", "seo_keywords", "seo_description"];
+    for (const lang of langs) {
+      for (const p of prefixes) {
+        const row = document.querySelector(`.form-row.field-${p}_${lang}`);
+        if (!row) continue;
+        row.classList.toggle('is-disabled', pending);
+        if (pending && !row.title) row.title = 'En attente de génération IA';
+      }
+    }
+  }
+
+  function applyAll() {
+    const langs = detectLangs();
+    if (langs.length === 0) return;
+    createLanguageTabs(langs);
+    applyTypeLogic(langs);
+    updateAlertsUi(langs);
+  }
+
+  const debouncedApplyAll = debounce(applyAll, 80);
+
+  document.addEventListener('DOMContentLoaded', applyAll);
+  document.getElementById('id_type')?.addEventListener('change', debouncedApplyAll);
+
+  // Si l’admin recharge dynamiquement (rare), on peut écouter des mutations :
+  // const mo = new MutationObserver(debouncedApplyAll);
+  // mo.observe(document.body, { childList: true, subtree: true });
+})();
+</code></pre>
+</body>
+</html>
