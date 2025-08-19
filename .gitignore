@@ -1,0 +1,17 @@
+# 📁 Répertoires à ignorer
+mirror/
+logs/
+apps/README/
+
+# 📄 Fichiers à ignorer
+01 - Doc HTML_mise à jour.bat
+log.txt
+structure.json
+apps/style.css
+
+# 🧠 Fichiers temporaires / système
+*.tmp
+*.log
+*.bak
+*.DS_Store
+__pycache__/
